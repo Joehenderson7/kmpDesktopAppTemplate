@@ -1,15 +1,16 @@
 [versions]
 compose-plugin = "1.6.10"
 junit = "4.13.2"
-kotlin = "2.1.21"
+kotlin = "1.9.21"
+room-runtime-jvm = "2.7.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+room-runtime-jvm = { group = "androidx.room", name = "room-runtime-jvm", version.ref = "room-runtime-jvm" }
 
 
 [plugins]
 jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

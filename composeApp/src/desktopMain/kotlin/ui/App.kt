@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,14 +38,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import data.SettingsManager
+import kotlinx.coroutines.launch
+import ui.components.HorizontalSplitPane
+import ui.components.VerticalSplitPane
 import ui.features.materialsTesting.lab.MaterialsTestingLabUi
 import ui.features.materialsTesting.lab.SoilProctorDetailUi
 import ui.features.materialsTesting.lab.CreateSoilProctorUi
@@ -156,135 +163,242 @@ private fun CollapsableNavigationRail(
     }
 }
 
+
 @Composable
 private fun PanelLayout(currentScreen: String) {
+    // Get the settings manager
+    val settingsManager = remember { SettingsManager.getInstance() }
+
+    // Create a coroutine scope for saving settings
+    val coroutineScope = rememberCoroutineScope()
+
     // State for the selected proctor ID
     var selectedProctorId by remember { mutableStateOf<String?>(null) }
 
-    Row(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Vertical panel (left) - Soil Proctors List
-        Card(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(250.dp)
-                .padding(8.dp)
-        ) {
-            Box(
+    // State for split pane positions - load from settings
+    var mainSplitPosition by remember { 
+        mutableStateOf(settingsManager.getFloat("mainSplitPosition", 0.25f))
+    }
+    var rightVerticalSplitPosition by remember { 
+        mutableStateOf(settingsManager.getFloat("rightVerticalSplitPosition", 0.5f))
+    }
+    var topHorizontalSplitPosition by remember { 
+        mutableStateOf(settingsManager.getFloat("topHorizontalSplitPosition", 0.5f))
+    }
+    var bottomHorizontalSplitPosition by remember { 
+        mutableStateOf(settingsManager.getFloat("bottomHorizontalSplitPosition", 0.5f))
+    }
+
+    // Save settings when the component is disposed
+    DisposableEffect(Unit) {
+        onDispose {
+            // Save all settings when the component is disposed
+            settingsManager.setFloat("mainSplitPosition", mainSplitPosition)
+            settingsManager.setFloat("rightVerticalSplitPosition", rightVerticalSplitPosition)
+            settingsManager.setFloat("topHorizontalSplitPosition", topHorizontalSplitPosition)
+            settingsManager.setFloat("bottomHorizontalSplitPosition", bottomHorizontalSplitPosition)
+        }
+    }
+
+    // Main horizontal split between left panel and right panels
+    HorizontalSplitPane(
+        modifier = Modifier.fillMaxSize(),
+        splitFraction = mainSplitPosition,
+        onSplitChanged = { 
+            mainSplitPosition = it
+            // Save the setting when it changes
+            coroutineScope.launch {
+                settingsManager.setFloat("mainSplitPosition", it)
+            }
+        },
+        // Left panel - Soil Proctors List
+        firstPane = {
+            Card(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(8.dp)
             ) {
-                when (currentScreen) {
-                    "MaterialsTesting" -> {
-                        MaterialsTestingLabUi(
-                            navigateToProctorDetails = { proctorId ->
-                                selectedProctorId = proctorId
-                            },
-                            navigateToCreateProctor = { /* Handle navigation to create proctor */ },
-                            navigateToSettings = { /* Handle navigation to settings */ }
-                        )
-                    }
-                    "Projects" -> {
-                        // Placeholder for Projects screen
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Projects List")
-                        }
-                    }
-                    else -> {
-                        // Default placeholder
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Select a screen from the navigation rail")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Two horizontal panels stacked (right)
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
-        ) {
-            // Top horizontal panel - Soil Proctor Details
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp)
-            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    when {
-                        currentScreen == "MaterialsTesting" && selectedProctorId != null -> {
-                            // Display the selected proctor's details
-                            SoilProctorDetailUi(proctorId = selectedProctorId!!)
-                        }
-                        currentScreen == "MaterialsTesting" -> {
-                            // Display a placeholder when no proctor is selected
-                            Text("Select a soil proctor to view details")
-                        }
-                        currentScreen == "Projects" -> {
-                            // Placeholder for Project details
-                            Text("Select a project to view details")
-                        }
-                        else -> {
-                            // Default placeholder
-                            Text("Select a screen from the navigation rail")
-                        }
-                    }
-                }
-            }
-
-            // Bottom horizontal panel - Create New Soil Proctor
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.tertiaryContainer)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(8.dp)
                 ) {
                     when (currentScreen) {
                         "MaterialsTesting" -> {
-                            // Create New Soil Proctor UI
-                            CreateSoilProctorUi(
-                                onSave = { /* Handle save */ },
-                                onCancel = { /* Handle cancel */ }
+                            MaterialsTestingLabUi(
+                                navigateToProctorDetails = { proctorId ->
+                                    selectedProctorId = proctorId
+                                },
+                                navigateToCreateProctor = { /* Handle navigation to create proctor */ },
+                                navigateToSettings = { /* Handle navigation to settings */ }
                             )
                         }
                         "Projects" -> {
-                            // Placeholder for Project creation
-                            Text("Create New Project")
+                            // Placeholder for Projects screen
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Projects List")
+                            }
                         }
                         else -> {
                             // Default placeholder
-                            Text("Select a screen from the navigation rail")
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Select a screen from the navigation rail")
+                            }
                         }
                     }
                 }
             }
+        },
+        // Right panels (4 adjustable panels)
+        secondPane = {
+            // Vertical split for the right side (top and bottom)
+            VerticalSplitPane(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp),
+                splitFraction = rightVerticalSplitPosition,
+                onSplitChanged = { 
+                    rightVerticalSplitPosition = it
+                    // Save the setting when it changes
+                    coroutineScope.launch {
+                        settingsManager.setFloat("rightVerticalSplitPosition", it)
+                    }
+                },
+                // Top panels (2 side by side)
+                firstPane = {
+                    HorizontalSplitPane(
+                        modifier = Modifier.fillMaxSize(),
+                        splitFraction = topHorizontalSplitPosition,
+                        onSplitChanged = { 
+                            topHorizontalSplitPosition = it
+                            // Save the setting when it changes
+                            coroutineScope.launch {
+                                settingsManager.setFloat("topHorizontalSplitPosition", it)
+                            }
+                        },
+                        // Top-Left panel
+                        firstPane = {
+                            Card(
+                                modifier = Modifier.fillMaxSize().padding(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    when {
+                                        currentScreen == "MaterialsTesting" && selectedProctorId != null -> {
+                                            // Display the selected proctor's details
+                                            SoilProctorDetailUi(proctorId = selectedProctorId!!)
+                                        }
+                                        currentScreen == "MaterialsTesting" -> {
+                                            // Display a placeholder when no proctor is selected
+                                            Text("Panel 1: Top-Left")
+                                        }
+                                        currentScreen == "Projects" -> {
+                                            // Placeholder for Project details
+                                            Text("Panel 1: Top-Left")
+                                        }
+                                        else -> {
+                                            // Default placeholder
+                                            Text("Panel 1: Top-Left")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        // Top-Right panel
+                        secondPane = {
+                            Card(
+                                modifier = Modifier.fillMaxSize().padding(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.primaryContainer)
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Panel 2: Top-Right")
+                                }
+                            }
+                        }
+                    )
+                },
+                // Bottom panels (2 side by side)
+                secondPane = {
+                    HorizontalSplitPane(
+                        modifier = Modifier.fillMaxSize(),
+                        splitFraction = bottomHorizontalSplitPosition,
+                        onSplitChanged = { 
+                            bottomHorizontalSplitPosition = it
+                            // Save the setting when it changes
+                            coroutineScope.launch {
+                                settingsManager.setFloat("bottomHorizontalSplitPosition", it)
+                            }
+                        },
+                        // Bottom-Left panel
+                        firstPane = {
+                            Card(
+                                modifier = Modifier.fillMaxSize().padding(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    when (currentScreen) {
+                                        "MaterialsTesting" -> {
+                                            // Create New Soil Proctor UI
+                                            CreateSoilProctorUi(
+                                                onSave = { /* Handle save */ },
+                                                onCancel = { /* Handle cancel */ }
+                                            )
+                                        }
+                                        "Projects" -> {
+                                            // Placeholder for Project creation
+                                            Text("Panel 3: Bottom-Left")
+                                        }
+                                        else -> {
+                                            // Default placeholder
+                                            Text("Panel 3: Bottom-Left")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        // Bottom-Right panel
+                        secondPane = {
+                            Card(
+                                modifier = Modifier.fillMaxSize().padding(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Panel 4: Bottom-Right")
+                                }
+                            }
+                        }
+                    )
+                }
+            )
         }
-    }
+    )
 }
 
 @Composable

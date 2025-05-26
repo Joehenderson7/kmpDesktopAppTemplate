@@ -39,8 +39,125 @@ Key dependencies in the project:
 
 ### Local Storage
 
-- Room database is planned for local data persistence
-- MongoDB integration is prepared but requires proper version configuration
+#### Room Database for Local Persistence
+
+The project uses Room database for local data persistence. Room provides an abstraction layer over SQLite that allows for more robust database access while harnessing the full power of SQLite.
+
+##### Room Dependencies
+
+Add these dependencies to your `composeApp/build.gradle.kts` file:
+
+```kotlin
+// Room dependencies
+implementation("androidx.room:room-runtime:2.6.1")
+implementation("androidx.room:room-ktx:2.6.1")
+ksp("androidx.room:room-compiler:2.6.1")
+
+// For Kotlin Symbol Processing (KSP)
+plugins {
+    id("com.google.devtools.ksp") version "1.9.21-1.0.15"
+}
+```
+
+##### Room Components
+
+1. **Entity**: Annotated data classes that represent tables in the database
+   ```kotlin
+   @Entity(tableName = "settings")
+   data class SettingsEntity(
+       @PrimaryKey val id: String,
+       val value: String
+   )
+   ```
+
+2. **DAO (Data Access Object)**: Interfaces that define database operations
+   ```kotlin
+   @Dao
+   interface SettingsDao {
+       @Query("SELECT * FROM settings WHERE id = :id")
+       suspend fun getSettingById(id: String): SettingsEntity?
+
+       @Insert(onConflict = OnConflictStrategy.REPLACE)
+       suspend fun insertSetting(setting: SettingsEntity)
+   }
+   ```
+
+3. **Database**: Abstract class that extends RoomDatabase
+   ```kotlin
+   @Database(entities = [SettingsEntity::class], version = 1)
+   abstract class AppDatabase : RoomDatabase() {
+       abstract fun settingsDao(): SettingsDao
+
+       companion object {
+           @Volatile
+           private var INSTANCE: AppDatabase? = null
+
+           fun getDatabase(context: Context): AppDatabase {
+               return INSTANCE ?: synchronized(this) {
+                   val instance = Room.databaseBuilder(
+                       context,
+                       AppDatabase::class.java,
+                       "app_database"
+                   ).build()
+                   INSTANCE = instance
+                   instance
+               }
+           }
+       }
+   }
+   ```
+
+4. **Repository**: Class that abstracts data operations
+   ```kotlin
+   class SettingsRepository(private val settingsDao: SettingsDao) {
+       suspend fun getSetting(id: String, defaultValue: String): String {
+           val setting = settingsDao.getSettingById(id)
+           return setting?.value ?: defaultValue
+       }
+
+       suspend fun saveSetting(id: String, value: String) {
+           settingsDao.insertSetting(SettingsEntity(id, value))
+       }
+   }
+   ```
+
+##### Using Room in the Application
+
+1. Initialize the database in your application:
+   ```kotlin
+   val database = AppDatabase.getDatabase(applicationContext)
+   val settingsRepository = SettingsRepository(database.settingsDao())
+   ```
+
+2. Read and write data using the repository:
+   ```kotlin
+   // Read setting
+   val value = settingsRepository.getSetting("split_position", "0.5")
+
+   // Save setting
+   settingsRepository.saveSetting("split_position", "0.7")
+   ```
+
+3. For UI components, use `rememberCoroutineScope()` to launch database operations:
+   ```kotlin
+   val coroutineScope = rememberCoroutineScope()
+
+   // Save setting when value changes
+   onSplitChanged = { newValue ->
+       splitPosition = newValue
+       coroutineScope.launch {
+           settingsRepository.saveSetting("split_position", newValue.toString())
+       }
+   }
+   ```
+
+#### MongoDB Integration
+
+MongoDB integration is prepared but requires proper version configuration. Use the following dependency:
+
+```kotlin
+implementation("org.mongodb:mongodb-driver-kotlin-coroutine:4.11.0")
+```
 
 ## Testing Information
 
@@ -137,9 +254,58 @@ The application uses a navigation system with defined destinations:
 - Keep UI components focused on presentation, with logic in ViewModels
 - Use composable functions for UI components with clear parameter definitions
 
+### Persisting UI State
+
+The application uses a `SettingsManager` class to persist UI state, such as split pane positions, between application reloads. This ensures that the user's UI customizations are remembered.
+
+#### SettingsManager
+
+The `SettingsManager` class provides methods for reading and writing settings to a properties file:
+
+```kotlin
+// Get the settings manager instance
+val settingsManager = SettingsManager.getInstance()
+
+// Read a setting
+val splitPosition = settingsManager.getFloat("splitPosition", 0.5f) // Default value is 0.5f
+
+// Write a setting
+settingsManager.setFloat("splitPosition", 0.7f)
+```
+
+#### Persisting Split Pane Positions
+
+The split pane positions are persisted using the `SettingsManager`:
+
+1. When the application starts, the split pane positions are loaded from the settings:
+   ```kotlin
+   var splitPosition by remember { 
+       mutableStateOf(settingsManager.getFloat("splitPosition", 0.5f))
+   }
+   ```
+
+2. When the split pane positions change, they are saved to the settings:
+   ```kotlin
+   onSplitChanged = { 
+       splitPosition = it
+       coroutineScope.launch {
+           settingsManager.setFloat("splitPosition", it)
+       }
+   }
+   ```
+
+3. When the application is closed, the split pane positions are saved to ensure no changes are lost:
+   ```kotlin
+   DisposableEffect(Unit) {
+       onDispose {
+           settingsManager.setFloat("splitPosition", splitPosition)
+       }
+   }
+   ```
+
 ### Future Development
 
-- Implement Room database for local storage
 - Complete the navigation system
 - Add proper error handling and loading states
 - Consider implementing dependency injection
+- Implement Room database for more complex data storage needs
