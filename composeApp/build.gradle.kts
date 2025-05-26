@@ -1,3 +1,4 @@
+
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -5,10 +6,14 @@ plugins {
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.compose.compiler)
 }
+repositories {
+    google()
+    mavenCentral()
+}
 
 kotlin {
     jvm("desktop")
-    
+
     sourceSets {
         all {
             languageSettings {
@@ -17,13 +22,32 @@ kotlin {
         }
 
         val desktopMain by getting
+        val desktopTest by getting
 
         desktopMain.dependencies {
+            // Compose dependencies for desktop
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
             implementation(compose.desktop.currentOs)
+
+            // Material icons extended
+            implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.11")
+
+            // UI Preview for @Preview annotation
+            implementation("org.jetbrains.compose.ui:ui-tooling-preview:1.5.11")
+
+            // Note: Material 3 Adaptive components are not available for desktop applications
+            // They are Android-specific and have been removed
+
+            // MongoDB driver dependency - commented out until version is specified
+            // implementation("org.mongodb:mongodb-driver-kotlin-coroutine")
+        }
+
+        desktopTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.junit)
         }
     }
 }
